@@ -1,56 +1,20 @@
 import React, { useState, useEffect } from 'react';
 
-// Default mock data for example products and categories
-const DEFAULT_CATEGORIES = ['Almacén', 'Bebidas', 'Aderezos', 'Bazar'];
-
-const DEFAULT_PRODUCTS = [
-  {
-    id: 'cunnington-cola',
-    name: 'Gaseosa Cunnington Cola 2.25L',
-    price: 1200,
-    category: 'Bebidas',
-    image: '/cunnington.jpg'
-  },
-  {
-    id: 'ketchup-natura',
-    name: 'Ketchup Natura Pouch 250g',
-    price: 950,
-    category: 'Aderezos',
-    image: '/ketchup.jpg'
-  },
-  {
-    id: 'don-satur',
-    name: 'Bizcocho Dulce Don Satur 200g',
-    price: 800,
-    category: 'Almacén',
-    image: '/don_satur.jpg'
-  }
-];
-
 export default function App() {
   // --- STATE ---
-  const [categories, setCategories] = useState(() => {
-    const saved = localStorage.getItem('tj_categories');
-    return saved ? JSON.parse(saved) : DEFAULT_CATEGORIES;
-  });
-
-  const [products, setProducts] = useState(() => {
-    const saved = localStorage.getItem('tj_products');
-    return saved ? JSON.parse(saved) : DEFAULT_PRODUCTS;
-  });
-
+  const [categories, setCategories] = useState([]);
+  const [products, setProducts] = useState([]);
   const [cart, setCart] = useState(() => {
     const saved = localStorage.getItem('tj_cart');
     return saved ? JSON.parse(saved) : [];
   });
 
+  const [loading, setLoading] = useState(true);
+  const [databaseName, setDatabaseName] = useState('Conectando...');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Todas');
   const [isAdminMode, setIsAdminMode] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
-  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
-  const [adminPassword, setAdminPassword] = useState('');
-  const [passwordError, setPasswordError] = useState('');
 
   // Admin Panels state
   const [activeAdminTab, setActiveAdminTab] = useState('products'); // 'products' or 'categories'
@@ -64,20 +28,47 @@ export default function App() {
   const [newProductImageBase64, setNewProductImageBase64] = useState('');
   const [imagePreview, setImagePreview] = useState('');
 
-  // --- SYNC WITH LOCAL STORAGE ---
-  useEffect(() => {
-    localStorage.setItem('tj_categories', JSON.stringify(categories));
-  }, [categories]);
+  // Password Verification state
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [adminPassword, setAdminPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
 
+  // --- FETCH DATA FROM SERVERLESS CLOUD DATABASE ON MOUNT ---
   useEffect(() => {
-    localStorage.setItem('tj_products', JSON.stringify(products));
-  }, [products]);
+    fetchData();
+  }, []);
 
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch('/api/data');
+      if (res.ok) {
+        const data = await res.json();
+        setCategories(data.categories || []);
+        setProducts(data.products || []);
+        setDatabaseName(data.database || 'Turso Cloud');
+        
+        // Auto-select first category as default for product form dropdown
+        if (data.categories && data.categories.length > 0) {
+          setNewProductCategory(data.categories[0]);
+        }
+      } else {
+        setDatabaseName('Error de conexión');
+      }
+    } catch (err) {
+      console.error('Error fetching data from backend:', err);
+      setDatabaseName('Modo Desconectado');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // --- SYNC CART WITH LOCAL STORAGE ---
   useEffect(() => {
     localStorage.setItem('tj_cart', JSON.stringify(cart));
   }, [cart]);
 
-  // Set default category when categories list changes
+  // Set default category when categories list updates
   useEffect(() => {
     if (categories.length > 0 && !newProductCategory) {
       setNewProductCategory(categories[0]);
@@ -131,94 +122,7 @@ export default function App() {
     setCart(prevCart => prevCart.filter(item => item.id !== productId));
   };
 
-  // Admin operations: Categories
-  const handleAddCategory = (e) => {
-    e.preventDefault();
-    const cleanName = newCategoryName.trim();
-    if (!cleanName) return;
-
-    if (categories.some(c => c.toLowerCase() === cleanName.toLowerCase())) {
-      alert('La categoría ya existe.');
-      return;
-    }
-
-    setCategories([...categories, cleanName]);
-    setNewCategoryName('');
-  };
-
-  const handleDeleteCategory = (catName) => {
-    if (confirm(`¿Estás seguro de que quieres eliminar la categoría "${catName}"? Los productos en esta categoría pasarán a "Sin Categoría".`)) {
-      setCategories(categories.filter(c => c !== catName));
-      // Re-assign products category
-      setProducts(products.map(p => 
-        p.category === catName ? { ...p, category: 'Sin Categoría' } : p
-      ));
-      if (selectedCategory === catName) {
-        setSelectedCategory('Todas');
-      }
-    }
-  };
-
-  // Admin operations: Products
-  const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setNewProductImageBase64(reader.result);
-      setImagePreview(reader.result);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleAddProduct = (e) => {
-    e.preventDefault();
-    const name = newProductName.trim();
-    const priceVal = parseFloat(newProductPrice);
-    
-    if (!name || isNaN(priceVal) || priceVal <= 0) {
-      alert('Por favor, ingresa un nombre válido y un precio mayor a 0.');
-      return;
-    }
-
-    const newProduct = {
-      id: 'prod-' + Date.now(),
-      name,
-      price: priceVal,
-      category: newProductCategory || 'Sin Categoría',
-      image: newProductImageBase64 || 'https://via.placeholder.com/150?text=Sin+Imagen'
-    };
-
-    setProducts([newProduct, ...products]);
-
-    // Reset Form
-    setNewProductName('');
-    setNewProductPrice('');
-    setNewProductImageBase64('');
-    setImagePreview('');
-  };
-
-  const handleDeleteProduct = (productId) => {
-    if (confirm('¿Estás seguro de eliminar este producto?')) {
-      setProducts(products.filter(p => p.id !== productId));
-      removeFromCart(productId);
-    }
-  };
-
-  const handleResetData = () => {
-    if (confirm('¿Quieres restablecer la tienda a la configuración original de ejemplo? Se borrarán tus cambios personalizados.')) {
-      setCategories(DEFAULT_CATEGORIES);
-      setProducts(DEFAULT_PRODUCTS);
-      setCart([]);
-      setSelectedCategory('Todas');
-      localStorage.removeItem('tj_categories');
-      localStorage.removeItem('tj_products');
-      localStorage.removeItem('tj_cart');
-    }
-  };
-
-  // Admin access validation
+  // Admin Toggle Handler
   const handleAdminClick = () => {
     if (isAdminMode) {
       setIsAdminMode(false);
@@ -238,6 +142,155 @@ export default function App() {
       setPasswordError('');
     } else {
       setPasswordError('Contraseña incorrecta. Inténtalo de nuevo.');
+    }
+  };
+
+  // Admin operations: Add Category
+  const handleAddCategory = async (e) => {
+    e.preventDefault();
+    const cleanName = newCategoryName.trim();
+    if (!cleanName) return;
+
+    if (categories.some(c => c.toLowerCase() === cleanName.toLowerCase())) {
+      alert('La categoría ya existe.');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/categories', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'joaco2026' // verified on serverless backend
+        },
+        body: JSON.stringify({ name: cleanName })
+      });
+
+      if (res.ok) {
+        setCategories([...categories, cleanName]);
+        setNewCategoryName('');
+      } else {
+        const errData = await res.json();
+        alert(errData.error || 'Error al guardar categoría.');
+      }
+    } catch (err) {
+      console.error('Error adding category:', err);
+      alert('Error de red. No se pudo guardar la categoría.');
+    }
+  };
+
+  // Admin operations: Delete Category
+  const handleDeleteCategory = async (catName) => {
+    if (confirm(`¿Estás seguro de que quieres eliminar la categoría "${catName}"? Los productos en esta categoría pasarán a "Sin Categoría".`)) {
+      try {
+        const res = await fetch(`/api/categories?name=${encodeURIComponent(catName)}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': 'joaco2026'
+          }
+        });
+
+        if (res.ok) {
+          setCategories(categories.filter(c => c !== catName));
+          setProducts(products.map(p => 
+            p.category === catName ? { ...p, category: 'Sin Categoría' } : p
+          ));
+          if (selectedCategory === catName) {
+            setSelectedCategory('Todas');
+          }
+        } else {
+          const errData = await res.json();
+          alert(errData.error || 'Error al eliminar categoría.');
+        }
+      } catch (err) {
+        console.error('Error deleting category:', err);
+        alert('Error de red. No se pudo eliminar la categoría.');
+      }
+    }
+  };
+
+  // Admin operations: Add Product image loader
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setNewProductImageBase64(reader.result);
+      setImagePreview(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Admin operations: Add Product
+  const handleAddProduct = async (e) => {
+    e.preventDefault();
+    const name = newProductName.trim();
+    const priceVal = parseFloat(newProductPrice);
+    
+    if (!name || isNaN(priceVal) || priceVal <= 0) {
+      alert('Por favor, ingresa un nombre válido y un precio mayor a 0.');
+      return;
+    }
+
+    const newProduct = {
+      id: 'prod-' + Date.now(),
+      name,
+      price: priceVal,
+      category: newProductCategory || 'Sin Categoría',
+      image: newProductImageBase64 || 'https://via.placeholder.com/150?text=Sin+Imagen'
+    };
+
+    try {
+      const res = await fetch('/api/products', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'joaco2026'
+        },
+        body: JSON.stringify(newProduct)
+      });
+
+      if (res.ok) {
+        setProducts([newProduct, ...products]);
+        
+        // Reset Form
+        setNewProductName('');
+        setNewProductPrice('');
+        setNewProductImageBase64('');
+        setImagePreview('');
+      } else {
+        const errData = await res.json();
+        alert(errData.error || 'Error al guardar el producto.');
+      }
+    } catch (err) {
+      console.error('Error adding product:', err);
+      alert('Error de red. No se pudo registrar el producto.');
+    }
+  };
+
+  // Admin operations: Delete Product
+  const handleDeleteProduct = async (productId) => {
+    if (confirm('¿Estás seguro de eliminar este producto?')) {
+      try {
+        const res = await fetch(`/api/products?id=${encodeURIComponent(productId)}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': 'joaco2026'
+          }
+        });
+
+        if (res.ok) {
+          setProducts(products.filter(p => p.id !== productId));
+          removeFromCart(productId);
+        } else {
+          const errData = await res.json();
+          alert(errData.error || 'Error al borrar el producto.');
+        }
+      } catch (err) {
+        console.error('Error deleting product:', err);
+        alert('Error de red. No se pudo borrar el producto.');
+      }
     }
   };
 
@@ -264,7 +317,6 @@ export default function App() {
     const encodedMessage = encodeURIComponent(message);
     const whatsappUrl = `https://wa.me/5491173578742?text=${encodedMessage}`;
     
-    // Open in new tab
     window.open(whatsappUrl, '_blank');
   };
 
@@ -274,6 +326,34 @@ export default function App() {
     const matchesCategory = selectedCategory === 'Todas' || product.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
+
+  // --- SKELETON LOADING VIEW ON LAUNCH ---
+  if (loading) {
+    return (
+      <div className="app-container" style={{justifyContent: 'center', alignItems: 'center', height: '100vh', gap: '1.5rem', backgroundColor: '#090d16'}}>
+        <div className="logo-container" style={{flexDirection: 'column', gap: '1rem', textAlign: 'center'}}>
+          <img src="/logo.jpg" alt="Tienda Joaco" className="logo-image" style={{height: '110px', width: 'auto', border: '2px solid rgba(255, 106, 0, 0.5)', borderRadius: '12px'}} />
+          <div style={{
+            width: '44px',
+            height: '44px',
+            border: '4px solid rgba(255, 255, 255, 0.1)',
+            borderTopColor: 'var(--primary)',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+            margin: '1.5rem auto 1rem auto'
+          }}></div>
+          <p style={{fontFamily: 'var(--font-title)', fontWeight: 600, color: 'var(--text-white)', fontSize: '1.1rem', letterSpacing: '0.3px'}}>
+            Conectando con Turso Cloud Database...
+          </p>
+        </div>
+        <style>{`
+          @keyframes spin {
+            to { transform: rotate(360deg); }
+          }
+        `}</style>
+      </div>
+    );
+  }
 
   return (
     <div className="app-container">
@@ -340,6 +420,32 @@ export default function App() {
 
       {/* WORKSPACE */}
       <main className="main-content">
+        {/* Connection status banner */}
+        <div style={{
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '0.5rem', 
+          fontSize: '0.8rem', 
+          fontWeight: 600, 
+          color: databaseName.includes("Turso") ? '#2e7d32' : '#d84315',
+          backgroundColor: databaseName.includes("Turso") ? 'rgba(46, 125, 50, 0.08)' : 'rgba(216, 67, 21, 0.08)',
+          padding: '0.4rem 1rem',
+          borderRadius: 'var(--radius-sm)',
+          width: 'fit-content',
+          marginBottom: '1.25rem',
+          border: `1px solid ${databaseName.includes("Turso") ? 'rgba(46, 125, 50, 0.15)' : 'rgba(216, 67, 21, 0.15)'}`
+        }}>
+          <span style={{
+            display: 'inline-block',
+            width: '8px',
+            height: '8px',
+            borderRadius: '50%',
+            backgroundColor: 'currentColor',
+            animation: databaseName.includes("Cargando") ? 'pulse 1s infinite alternate' : 'none'
+          }}></span>
+          <span>Base de datos: {databaseName}</span>
+        </div>
+
         {isAdminMode ? (
           /* ========================================================
              ADMINISTRATIVE CONTROL PANEL
@@ -435,15 +541,9 @@ export default function App() {
 
                   {/* Right List: Display products */}
                   <div className="admin-list-card">
-                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem'}}>
-                      <h3 className="admin-form-title" style={{margin: 0}}>Inventario de Productos ({products.length})</h3>
-                      <button 
-                        onClick={handleResetData}
-                        style={{fontSize: '0.8rem', color: 'var(--secondary-dark)', fontWeight: 600, borderBottom: '1px dashed currentColor', padding: '2px 0'}}
-                      >
-                        Restablecer Ejemplos
-                      </button>
-                    </div>
+                    <h3 className="admin-form-title" style={{marginBottom: '1rem'}}>
+                      Inventario de Productos ({products.length})
+                    </h3>
 
                     {products.length === 0 ? (
                       <div className="empty-state">
