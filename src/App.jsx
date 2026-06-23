@@ -19,6 +19,9 @@ export default function App() {
   // Admin Panels state
   const [activeAdminTab, setActiveAdminTab] = useState('products'); // 'products' or 'categories'
   
+  // Product Edit state
+  const [editingProduct, setEditingProduct] = useState(null);
+
   // Forms state
   const [newCategoryName, setNewCategoryName] = useState('');
   
@@ -126,6 +129,7 @@ export default function App() {
   const handleAdminClick = () => {
     if (isAdminMode) {
       setIsAdminMode(false);
+      handleCancelEdit();
     } else {
       setAdminPassword('');
       setPasswordError('');
@@ -222,7 +226,32 @@ export default function App() {
     reader.readAsDataURL(file);
   };
 
-  // Admin operations: Add Product
+  // Admin operations: Edit button click handler
+  const handleEditClick = (prod) => {
+    setEditingProduct(prod);
+    setNewProductName(prod.name);
+    setNewProductPrice(prod.price.toString());
+    setNewProductCategory(prod.category);
+    setNewProductImageBase64(prod.image);
+    setImagePreview(prod.image);
+    
+    // Smooth scroll to form in mobile devices
+    const formEl = document.querySelector('.admin-form-card');
+    if (formEl) {
+      formEl.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  // Admin operations: Cancel edit mode
+  const handleCancelEdit = () => {
+    setEditingProduct(null);
+    setNewProductName('');
+    setNewProductPrice('');
+    setNewProductImageBase64('');
+    setImagePreview('');
+  };
+
+  // Admin operations: Add/Edit Product Save
   const handleAddProduct = async (e) => {
     e.preventDefault();
     const name = newProductName.trim();
@@ -233,8 +262,9 @@ export default function App() {
       return;
     }
 
-    const newProduct = {
-      id: 'prod-' + Date.now(),
+    const productId = editingProduct ? editingProduct.id : 'prod-' + Date.now();
+    const productPayload = {
+      id: productId,
       name,
       price: priceVal,
       category: newProductCategory || 'Sin Categoría',
@@ -248,11 +278,18 @@ export default function App() {
           'Content-Type': 'application/json',
           'Authorization': 'joaco2026'
         },
-        body: JSON.stringify(newProduct)
+        body: JSON.stringify(productPayload)
       });
 
       if (res.ok) {
-        setProducts([newProduct, ...products]);
+        if (editingProduct) {
+          // Update product in storefront state
+          setProducts(products.map(p => p.id === productId ? productPayload : p));
+          setEditingProduct(null);
+        } else {
+          // Add product to storefront state
+          setProducts([productPayload, ...products]);
+        }
         
         // Reset Form
         setNewProductName('');
@@ -264,7 +301,7 @@ export default function App() {
         alert(errData.error || 'Error al guardar el producto.');
       }
     } catch (err) {
-      console.error('Error adding product:', err);
+      console.error('Error saving product:', err);
       alert('Error de red. No se pudo registrar el producto.');
     }
   };
@@ -283,6 +320,11 @@ export default function App() {
         if (res.ok) {
           setProducts(products.filter(p => p.id !== productId));
           removeFromCart(productId);
+          
+          // Re-verify if we were editing the deleted product
+          if (editingProduct && editingProduct.id === productId) {
+            handleCancelEdit();
+          }
         } else {
           const errData = await res.json();
           alert(errData.error || 'Error al borrar el producto.');
@@ -327,30 +369,14 @@ export default function App() {
     return matchesSearch && matchesCategory;
   });
 
-  // --- SKELETON LOADING VIEW ON LAUNCH ---
+  // --- PREMIUM SKELETON LOADING VIEW (No mentions of Turso) ---
   if (loading) {
     return (
-      <div className="app-container" style={{justifyContent: 'center', alignItems: 'center', height: '100vh', gap: '1.5rem', backgroundColor: '#090d16'}}>
-        <div className="logo-container" style={{flexDirection: 'column', gap: '1rem', textAlign: 'center'}}>
-          <img src="/logo.jpg" alt="Tienda Joaco" className="logo-image" style={{height: '110px', width: 'auto', border: '2px solid rgba(255, 106, 0, 0.5)', borderRadius: '12px'}} />
-          <div style={{
-            width: '44px',
-            height: '44px',
-            border: '4px solid rgba(255, 255, 255, 0.1)',
-            borderTopColor: 'var(--primary)',
-            borderRadius: '50%',
-            animation: 'spin 1s linear infinite',
-            margin: '1.5rem auto 1rem auto'
-          }}></div>
-          <p style={{fontFamily: 'var(--font-title)', fontWeight: 600, color: 'var(--text-white)', fontSize: '1.1rem', letterSpacing: '0.3px'}}>
-            Conectando con Turso Cloud Database...
-          </p>
-        </div>
-        <style>{`
-          @keyframes spin {
-            to { transform: rotate(360deg); }
-          }
-        `}</style>
+      <div className="loading-screen">
+        <img src="/logo.jpg" alt="Cargando..." className="loading-logo" />
+        <p style={{fontFamily: 'var(--font-title)', fontWeight: 600, color: 'var(--text-white)', fontSize: '1.05rem', letterSpacing: '0.5px'}}>
+          Cargando tu tienda...
+        </p>
       </div>
     );
   }
@@ -387,15 +413,15 @@ export default function App() {
               className={`admin-toggle-btn ${isAdminMode ? 'active' : ''}`}
               title="Modo Administrador"
             >
-              <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                 <path d="M12 15a3 3 0 100-6 3 3 0 000 6z"></path>
                 <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"></path>
               </svg>
-              <span>{isAdminMode ? 'Volver a Tienda' : 'Modo Admin'}</span>
+              <span>{isAdminMode ? 'Tienda' : 'Admin'}</span>
             </button>
 
             <button onClick={() => setIsCartOpen(true)} className="cart-trigger" aria-label="Ver carrito">
-              <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                 <circle cx="9" cy="21" r="1"></circle>
                 <circle cx="20" cy="21" r="1"></circle>
                 <path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"></path>
@@ -408,11 +434,10 @@ export default function App() {
         </div>
       </header>
 
-      {/* HERO BANNER - Displayed only in storefront mode */}
+      {/* HERO BANNER - Clean gradient (no duplicate logo) */}
       {!isAdminMode && (
         <section className="hero-banner">
           <div className="hero-content">
-            <img src="/logo.jpg" alt="Tienda Joaco Banner" className="hero-logo" />
             <p className="hero-tagline">🛍️ ¡Tu tienda de confianza al alcance de un clic! 🛍️</p>
           </div>
         </section>
@@ -420,31 +445,32 @@ export default function App() {
 
       {/* WORKSPACE */}
       <main className="main-content">
-        {/* Connection status banner */}
-        <div style={{
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: '0.5rem', 
-          fontSize: '0.8rem', 
-          fontWeight: 600, 
-          color: databaseName.includes("Turso") ? '#2e7d32' : '#d84315',
-          backgroundColor: databaseName.includes("Turso") ? 'rgba(46, 125, 50, 0.08)' : 'rgba(216, 67, 21, 0.08)',
-          padding: '0.4rem 1rem',
-          borderRadius: 'var(--radius-sm)',
-          width: 'fit-content',
-          marginBottom: '1.25rem',
-          border: `1px solid ${databaseName.includes("Turso") ? 'rgba(46, 125, 50, 0.15)' : 'rgba(216, 67, 21, 0.15)'}`
-        }}>
-          <span style={{
-            display: 'inline-block',
-            width: '8px',
-            height: '8px',
-            borderRadius: '50%',
-            backgroundColor: 'currentColor',
-            animation: databaseName.includes("Cargando") ? 'pulse 1s infinite alternate' : 'none'
-          }}></span>
-          <span>Base de datos: {databaseName}</span>
-        </div>
+        {/* Connection status banner - Displayed ONLY in admin mode */}
+        {isAdminMode && (
+          <div style={{
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '0.5rem', 
+            fontSize: '0.8rem', 
+            fontWeight: 600, 
+            color: databaseName.includes("Turso") ? '#2e7d32' : '#d84315',
+            backgroundColor: databaseName.includes("Turso") ? 'rgba(46, 125, 50, 0.08)' : 'rgba(216, 67, 21, 0.08)',
+            padding: '0.4rem 1rem',
+            borderRadius: 'var(--radius-sm)',
+            width: 'fit-content',
+            marginBottom: '1.25rem',
+            border: `1px solid ${databaseName.includes("Turso") ? 'rgba(46, 125, 50, 0.15)' : 'rgba(216, 67, 21, 0.15)'}`
+          }}>
+            <span style={{
+              display: 'inline-block',
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              backgroundColor: 'currentColor'
+            }}></span>
+            <span>Base de datos: {databaseName}</span>
+          </div>
+        )}
 
         {isAdminMode ? (
           /* ========================================================
@@ -470,9 +496,16 @@ export default function App() {
               {activeAdminTab === 'products' ? (
                 /* MANAGE PRODUCTS WORKSPACE */
                 <div className="admin-grid-layout">
-                  {/* Left Form: Add product */}
+                  {/* Left Form: Add / Edit product */}
                   <form onSubmit={handleAddProduct} className="admin-form-card">
-                    <h3 className="admin-form-title">Cargar Producto</h3>
+                    <h3 className="admin-form-title">
+                      <span>{editingProduct ? 'Editar Producto' : 'Cargar Producto'}</span>
+                      {editingProduct && (
+                        <span style={{fontSize: '0.75rem', fontWeight: 600, color: 'var(--secondary-dark)'}}>
+                          [Editando]
+                        </span>
+                      )}
+                    </h3>
                     
                     <div className="form-group">
                       <label className="form-label">Nombre del Producto</label>
@@ -535,8 +568,14 @@ export default function App() {
                     </div>
 
                     <button type="submit" className="submit-form-btn">
-                      Guardar Producto
+                      {editingProduct ? 'Guardar Cambios' : 'Guardar Producto'}
                     </button>
+
+                    {editingProduct && (
+                      <button type="button" onClick={handleCancelEdit} className="cancel-edit-btn">
+                        Cancelar Edición
+                      </button>
+                    )}
                   </form>
 
                   {/* Right List: Display products */}
@@ -572,31 +611,44 @@ export default function App() {
                                 <td style={{fontWeight: 600}}>{prod.name}</td>
                                 <td>
                                   <span style={{
-                                    backgroundColor: 'var(--light-bg)',
+                                    backgroundColor: 'var(--primary-light)',
+                                    color: 'var(--primary-dark)',
                                     padding: '0.25rem 0.5rem',
                                     borderRadius: 'var(--radius-sm)',
                                     fontSize: '0.8rem',
-                                    fontWeight: 500
+                                    fontWeight: 700
                                   }}>
                                     {prod.category}
                                   </span>
                                 </td>
-                                <td style={{fontFamily: 'var(--font-title)', fontWeight: 700}}>
+                                <td style={{fontFamily: 'var(--font-title)', fontWeight: 800}}>
                                   ${prod.price.toLocaleString('es-AR')}
                                 </td>
-                                <td style={{textAlign: 'right'}}>
-                                  <button 
-                                    onClick={() => handleDeleteProduct(prod.id)} 
-                                    className="delete-action-btn"
-                                    title="Eliminar producto"
-                                  >
-                                    <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                                      <polyline points="3 6 5 6 21 6"></polyline>
-                                      <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path>
-                                      <line x1="10" y1="11" x2="10" y2="17"></line>
-                                      <line x1="14" y1="11" x2="14" y2="17"></line>
-                                    </svg>
-                                  </button>
+                                <td>
+                                  <div className="admin-table-actions">
+                                    <button 
+                                      type="button"
+                                      onClick={() => handleEditClick(prod)}
+                                      className="edit-action-btn"
+                                      title="Editar producto"
+                                    >
+                                      <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                                        <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"></path>
+                                        <path d="M18.5 2.5a2.121 2.121 0 113 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                      </svg>
+                                    </button>
+                                    <button 
+                                      type="button"
+                                      onClick={() => handleDeleteProduct(prod.id)} 
+                                      className="delete-action-btn"
+                                      title="Eliminar producto"
+                                    >
+                                      <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                                        <polyline points="3 6 5 6 21 6"></polyline>
+                                        <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path>
+                                      </svg>
+                                    </button>
+                                  </div>
                                 </td>
                               </tr>
                             ))}
@@ -746,7 +798,7 @@ export default function App() {
                               onClick={() => addToCart(prod.id)} 
                               className="add-to-cart-btn"
                             >
-                              <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                                 <line x1="12" y1="5" x2="12" y2="19"></line>
                                 <line x1="5" y1="12" x2="19" y2="12"></line>
                               </svg>
