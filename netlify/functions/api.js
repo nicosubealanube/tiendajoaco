@@ -143,8 +143,12 @@ const isTursoConfigured = () => {
 let dbClient = null;
 if (isTursoConfigured()) {
   try {
+    let databaseUrl = process.env.TURSO_DATABASE_URL || "";
+    if (databaseUrl.startsWith("libsql://")) {
+      databaseUrl = databaseUrl.replace("libsql://", "https://");
+    }
     dbClient = createClient({
-      url: process.env.TURSO_DATABASE_URL,
+      url: databaseUrl,
       authToken: process.env.TURSO_AUTH_TOKEN,
     });
   } catch (error) {
