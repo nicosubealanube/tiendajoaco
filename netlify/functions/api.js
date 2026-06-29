@@ -1,4 +1,4 @@
-const { createClient } = require("@libsql/client");
+import { createClient } from "@libsql/client";
 
 // Fallback in-memory database to keep the app working locally without Turso keys
 let memoryCategories = ['Almacén', 'Bebidas', 'Aderezos', 'Bazar'];
@@ -218,8 +218,11 @@ const initializeDatabase = async (client) => {
   }
 };
 
+// Single initialization cache flag to prevent running setup schema queries on every request
+let isInitialized = false;
+
 // Single entry point handler for Netlify Functions (v1 API syntax)
-exports.handler = async (event, context) => {
+export const handler = async (event, context) => {
   const path = event.path.replace(/\/\.netlify\/functions\/api/, "").replace(/\/api/, "");
   const method = event.httpMethod;
   const authHeader = event.headers.authorization;
@@ -246,10 +249,11 @@ exports.handler = async (event, context) => {
     };
   }
 
-  // If Turso is configured, make sure tables are initialized
-  if (dbClient) {
+  // If Turso is configured, make sure tables are initialized (only once per container)
+  if (dbClient && !isInitialized) {
     try {
       await initializeDatabase(dbClient);
+      isInitialized = true;
     } catch (dbInitErr) {
       console.error("Database initialization failed, switching to memory mode:", dbInitErr);
       dbClient = null; // Fallback to memory cache
