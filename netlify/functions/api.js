@@ -1,4 +1,4 @@
-import { createClient } from "@libsql/client";
+import { createClient } from "@libsql/client/web";
 
 // Fallback in-memory database to keep the app working locally without Turso keys
 let memoryCategories = ['Almacén', 'Bebidas', 'Aderezos', 'Bazar'];
