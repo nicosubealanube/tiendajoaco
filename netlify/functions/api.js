@@ -3,26 +3,132 @@ const { createClient } = require("@libsql/client");
 // Fallback in-memory database to keep the app working locally without Turso keys
 let memoryCategories = ['Almacén', 'Bebidas', 'Aderezos', 'Bazar'];
 let memoryProducts = [
+  // Main Store Products
   {
     id: 'cunnington-cola',
     name: 'Gaseosa Cunnington Cola 2.25L',
     price: 1200,
     category: 'Bebidas',
-    image: '/cunnington.jpg'
+    image: '/cunnington.jpg',
+    shop_id: 'main'
   },
   {
     id: 'ketchup-natura',
     name: 'Ketchup Natura Pouch 250g',
     price: 950,
     category: 'Aderezos',
-    image: '/ketchup.jpg'
+    image: '/ketchup.jpg',
+    shop_id: 'main'
   },
   {
     id: 'don-satur',
     name: 'Bizcocho Dulce Don Satur 200g',
     price: 800,
     category: 'Almacén',
-    image: '/don_satur.jpg'
+    image: '/don_satur.jpg',
+    shop_id: 'main'
+  },
+
+  // Tinicome (Restaurante)
+  {
+    id: 'tini-1',
+    name: 'Hamburguesa con Queso',
+    price: 4500,
+    category: 'Hamburguesas',
+    image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=400&q=80',
+    shop_id: 'tinicome'
+  },
+  {
+    id: 'tini-2',
+    name: 'Hamburguesa Completa',
+    price: 5800,
+    category: 'Hamburguesas',
+    image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=400&q=80',
+    shop_id: 'tinicome'
+  },
+  {
+    id: 'tini-3',
+    name: 'Milanesa con Papas Fritas',
+    price: 6200,
+    category: 'Minutas',
+    image: 'https://images.unsplash.com/photo-1601050690597-df056fb4ce78?auto=format&fit=crop&w=400&q=80',
+    shop_id: 'tinicome'
+  },
+  {
+    id: 'tini-4',
+    name: 'Fideos con Salsa Fileto',
+    price: 3800,
+    category: 'Pastas',
+    image: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=400&q=80',
+    shop_id: 'tinicome'
+  },
+
+  // Restaurante El Lostan
+  {
+    id: 'lost-1',
+    name: 'Pizza Especial Lostan',
+    price: 6500,
+    category: 'Pizzas',
+    image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=400&q=80',
+    shop_id: 'lostan'
+  },
+  {
+    id: 'lost-2',
+    name: 'Empanadas de Carne (3u)',
+    price: 2400,
+    category: 'Entradas',
+    image: 'https://images.unsplash.com/photo-1541532713592-79a0317b6b77?auto=format&fit=crop&w=400&q=80',
+    shop_id: 'lostan'
+  },
+  {
+    id: 'lost-3',
+    name: 'Suprema de Pollo con Puré',
+    price: 5500,
+    category: 'Minutas',
+    image: 'https://images.unsplash.com/photo-1632778149955-e80f8ceca218?auto=format&fit=crop&w=400&q=80',
+    shop_id: 'lostan'
+  },
+  {
+    id: 'lost-4',
+    name: 'Ravioles de Verdura con Tuco',
+    price: 4800,
+    category: 'Pastas',
+    image: 'https://images.unsplash.com/photo-1484723091739-30a097e8f929?auto=format&fit=crop&w=400&q=80',
+    shop_id: 'lostan'
+  },
+
+  // Heladería Rompesol
+  {
+    id: 'romp-1',
+    name: 'Kilo de Helado',
+    price: 8500,
+    category: 'Vasos',
+    image: 'https://images.unsplash.com/photo-1501443762994-82bd5dace89a?auto=format&fit=crop&w=400&q=80',
+    shop_id: 'rompesol'
+  },
+  {
+    id: 'romp-2',
+    name: '¼ Kilo de Helado',
+    price: 2500,
+    category: 'Vasos',
+    image: 'https://images.unsplash.com/photo-1501443762994-82bd5dace89a?auto=format&fit=crop&w=400&q=80',
+    shop_id: 'rompesol'
+  },
+  {
+    id: 'romp-3',
+    name: 'Cucurucho Especial',
+    price: 1800,
+    category: 'Conos',
+    image: 'https://images.unsplash.com/photo-1579306193798-1e4c8c54c30c?auto=format&fit=crop&w=400&q=80',
+    shop_id: 'rompesol'
+  },
+  {
+    id: 'romp-4',
+    name: 'Paleta Bombón de Chocolate',
+    price: 1200,
+    category: 'Paletas',
+    image: 'https://images.unsplash.com/photo-1488477181946-6428a0291777?auto=format&fit=crop&w=400&q=80',
+    shop_id: 'rompesol'
   }
 ];
 
@@ -64,6 +170,13 @@ const initializeDatabase = async (client) => {
     )
   `);
 
+  // Migrate schema to include shop_id column if it doesn't exist yet
+  try {
+    await client.execute("ALTER TABLE products ADD COLUMN shop_id TEXT DEFAULT 'main'");
+  } catch (err) {
+    // Ignore error if column already exists
+  }
+
   // Seed default categories
   const catCount = await client.execute("SELECT COUNT(*) as count FROM categories");
   if (catCount.rows[0].count === 0) {
@@ -75,14 +188,32 @@ const initializeDatabase = async (client) => {
     }
   }
 
-  // Seed default products
-  const prodCount = await client.execute("SELECT COUNT(*) as count FROM products");
-  if (prodCount.rows[0].count === 0) {
-    for (const prod of memoryProducts) {
+  // Seed default main products
+  const mainProdCount = await client.execute("SELECT COUNT(*) as count FROM products WHERE shop_id = 'main'");
+  if (mainProdCount.rows[0].count === 0) {
+    const mainDefault = memoryProducts.filter(p => p.shop_id === 'main');
+    for (const prod of mainDefault) {
       await client.execute({
-        sql: "INSERT INTO products (id, name, price, category, image) VALUES (?, ?, ?, ?, ?)",
+        sql: "INSERT INTO products (id, name, price, category, image, shop_id) VALUES (?, ?, ?, ?, ?, 'main')",
         args: [prod.id, prod.name, prod.price, prod.category, prod.image]
       });
+    }
+  }
+
+  // Seed default restaurant & ice cream shop products
+  for (const shop of ['tinicome', 'lostan', 'rompesol']) {
+    const shopProdCount = await client.execute({
+      sql: "SELECT COUNT(*) as count FROM products WHERE shop_id = ?",
+      args: [shop]
+    });
+    if (shopProdCount.rows[0].count === 0) {
+      const shopDefaultProducts = memoryProducts.filter(p => p.shop_id === shop);
+      for (const prod of shopDefaultProducts) {
+        await client.execute({
+          sql: "INSERT INTO products (id, name, price, category, image, shop_id) VALUES (?, ?, ?, ?, ?, ?)",
+          args: [prod.id, prod.name, prod.price, prod.category, prod.image, prod.shop_id]
+        });
+      }
     }
   }
 };
@@ -139,7 +270,8 @@ exports.handler = async (event, context) => {
           name: row.name,
           price: row.price,
           category: row.category,
-          image: row.image
+          image: row.image,
+          shop_id: row.shop_id || 'main'
         }));
         
         const categories = catResult.rows.map(row => row.name);
@@ -167,7 +299,8 @@ exports.handler = async (event, context) => {
        2. ROUTE: POST /products (Add new product)
        ========================================== */
     if (path === "/products" && method === "POST") {
-      const { id, name, price, category, image } = JSON.parse(event.body);
+      const { id, name, price, category, image, shop_id } = JSON.parse(event.body);
+      const activeShop = shop_id || 'main';
       
       if (!name || isNaN(price) || price <= 0) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: "Datos de producto inválidos" }) };
@@ -175,11 +308,19 @@ exports.handler = async (event, context) => {
 
       if (dbClient) {
         await dbClient.execute({
-          sql: "INSERT OR REPLACE INTO products (id, name, price, category, image) VALUES (?, ?, ?, ?, ?)",
-          args: [id, name, price, category, image]
+          sql: "INSERT OR REPLACE INTO products (id, name, price, category, image, shop_id) VALUES (?, ?, ?, ?, ?, ?)",
+          args: [id, name, price, category, image, activeShop]
         });
       } else {
-        memoryProducts = [{ id, name, price, category, image }, ...memoryProducts];
+        // Check if editing existing product in memory
+        const existingIdx = memoryProducts.findIndex(p => p.id === id);
+        const productData = { id, name, price, category, image, shop_id: activeShop };
+        
+        if (existingIdx !== -1) {
+          memoryProducts[existingIdx] = productData;
+        } else {
+          memoryProducts = [productData, ...memoryProducts];
+        }
       }
 
       return {
