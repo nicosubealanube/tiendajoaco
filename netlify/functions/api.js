@@ -262,6 +262,17 @@ export const handler = async (event, context) => {
 
   try {
     /* ==========================================
+       0. ROUTE: GET /test (Diagnostic endpoint)
+       ========================================== */
+    if (path === "/test" && method === "GET") {
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({ ok: true, message: "Serverless function is working!" })
+      };
+    }
+
+    /* ==========================================
        1. ROUTE: GET /data (Stores dashboard data)
        ========================================== */
     if (path === "/data" && method === "GET") {
