@@ -299,8 +299,19 @@ export const handler = async (event, context) => {
       if (dbClient) {
         try {
           const start = Date.now();
-          const result = await dbClient.execute("SELECT 1");
-          debugInfo.queryResult = result.rows;
+          // Test select 1
+          const testRes = await dbClient.execute("SELECT 1");
+          debugInfo.queryResult = testRes.rows;
+          
+          // Test products size
+          const prodSizeRes = await dbClient.execute("SELECT id, name, category, length(image) as img_len, shop_id FROM products");
+          debugInfo.productsList = prodSizeRes.rows;
+          
+          // Test total database size estimation
+          const totalImgLen = prodSizeRes.rows.reduce((sum, row) => sum + (row.img_len || 0), 0);
+          debugInfo.totalImageBytes = totalImgLen;
+          debugInfo.totalProductsCount = prodSizeRes.rows.length;
+          
           debugInfo.queryTimeMs = Date.now() - start;
           debugInfo.success = true;
         } catch (err) {
