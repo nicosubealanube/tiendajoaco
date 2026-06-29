@@ -222,6 +222,14 @@ const initializeDatabase = async (client) => {
   }
 };
 
+// Promise timeout helper to protect from Netlify Lambda timeouts (502 / 504)
+const withTimeout = (promise, ms) => {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout de base de datos")), ms))
+  ]);
+};
+
 // Single initialization cache flag to prevent running setup schema queries on every request
 let isInitialized = false;
 
@@ -253,10 +261,10 @@ export const handler = async (event, context) => {
     };
   }
 
-  // If Turso is configured, make sure tables are initialized (only once per container)
+  // If Turso is configured, make sure tables are initialized (only once per container, with 3s timeout)
   if (dbClient && !isInitialized) {
     try {
-      await initializeDatabase(dbClient);
+      await withTimeout(initializeDatabase(dbClient), 3000);
       isInitialized = true;
     } catch (dbInitErr) {
       console.error("Database initialization failed, switching to memory mode:", dbInitErr);
@@ -281,25 +289,40 @@ export const handler = async (event, context) => {
        ========================================== */
     if (path === "/data" && method === "GET") {
       if (dbClient) {
-        const prodResult = await dbClient.execute("SELECT * FROM products");
-        const catResult = await dbClient.execute("SELECT * FROM categories");
-        
-        const products = prodResult.rows.map(row => ({
-          id: row.id,
-          name: row.name,
-          price: row.price,
-          category: row.category,
-          image: row.image,
-          shop_id: row.shop_id || 'main'
-        }));
-        
-        const categories = catResult.rows.map(row => row.name);
-        
-        return {
-          statusCode: 200,
-          headers,
-          body: JSON.stringify({ products, categories, database: "Turso Cloud" })
-        };
+        try {
+          // Set a 3.5s timeout for fetching data
+          const prodResult = await withTimeout(dbClient.execute("SELECT * FROM products"), 3500);
+          const catResult = await withTimeout(dbClient.execute("SELECT * FROM categories"), 3500);
+          
+          const products = prodResult.rows.map(row => ({
+            id: row.id,
+            name: row.name,
+            price: row.price,
+            category: row.category,
+            image: row.image,
+            shop_id: row.shop_id || 'main'
+          }));
+          
+          const categories = catResult.rows.map(row => row.name);
+          
+          return {
+            statusCode: 200,
+            headers,
+            body: JSON.stringify({ products, categories, database: "Turso Cloud" })
+          };
+        } catch (queryErr) {
+          console.error("Database queries failed or timed out, using fallback:", queryErr);
+          // Return default memory products to avoid crashing page
+          return {
+            statusCode: 200,
+            headers,
+            body: JSON.stringify({
+              products: memoryProducts,
+              categories: memoryCategories,
+              database: `Turso Fallback (Alerta: conexión lenta con la nube)`
+            })
+          };
+        }
       } else {
         // Return memory values
         return {
@@ -308,7 +331,7 @@ export const handler = async (event, context) => {
           body: JSON.stringify({
             products: memoryProducts,
             categories: memoryCategories,
-            database: "In-Memory Local (Configure Turso in .env)"
+            database: "In-Memory Local (Configure Turso en Netlify)"
           })
         };
       }
