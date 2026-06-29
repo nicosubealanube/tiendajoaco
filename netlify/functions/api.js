@@ -285,6 +285,41 @@ export const handler = async (event, context) => {
     }
 
     /* ==========================================
+       00. ROUTE: GET /debug (Diagnostic endpoint)
+       ========================================== */
+    if (path === "/debug" && method === "GET") {
+      const debugInfo = {
+        hasDbClient: !!dbClient,
+        isInitialized,
+        tursoUrl: process.env.TURSO_DATABASE_URL ? (process.env.TURSO_DATABASE_URL.length > 20 ? process.env.TURSO_DATABASE_URL.substring(0, 20) + "..." : process.env.TURSO_DATABASE_URL) : "undefined",
+        hasToken: !!process.env.TURSO_AUTH_TOKEN,
+        nodeVersion: process.version,
+      };
+
+      if (dbClient) {
+        try {
+          const start = Date.now();
+          const result = await dbClient.execute("SELECT 1");
+          debugInfo.queryResult = result.rows;
+          debugInfo.queryTimeMs = Date.now() - start;
+          debugInfo.success = true;
+        } catch (err) {
+          debugInfo.success = false;
+          debugInfo.error = err.message;
+          debugInfo.errorStack = err.stack;
+        }
+      } else {
+        debugInfo.error = "dbClient is null";
+      }
+
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify(debugInfo)
+      };
+    }
+
+    /* ==========================================
        1. ROUTE: GET /data (Stores dashboard data)
        ========================================== */
     if (path === "/data" && method === "GET") {
