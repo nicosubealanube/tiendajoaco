@@ -340,14 +340,30 @@ export const handler = async (event, context) => {
           const prodResult = await withTimeout(dbClient.execute("SELECT * FROM products"), 3500);
           const catResult = await withTimeout(dbClient.execute("SELECT * FROM categories"), 3500);
           
-          const products = prodResult.rows.map(row => ({
-            id: row.id,
-            name: row.name,
-            price: row.price,
-            category: row.category,
-            image: row.image,
-            shop_id: row.shop_id || 'main'
-          }));
+          const products = prodResult.rows.map(row => {
+            let img = row.image;
+            // If the base64 image is too large (greater than 120KB), replace it with a placeholder
+            // to avoid exceeding Netlify's 6MB payload response limit.
+            if (img && img.length > 120000) {
+              if (row.shop_id === 'tinicome') {
+                img = 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=400&q=80';
+              } else if (row.shop_id === 'lostan') {
+                img = 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=400&q=80';
+              } else if (row.shop_id === 'rompesol') {
+                img = 'https://images.unsplash.com/photo-1501443762994-82bd5dace89a?auto=format&fit=crop&w=400&q=80';
+              } else {
+                img = '/logo.jpg';
+              }
+            }
+            return {
+              id: row.id,
+              name: row.name,
+              price: row.price,
+              category: row.category,
+              image: img,
+              shop_id: row.shop_id || 'main'
+            };
+          });
           
           const categories = catResult.rows.map(row => row.name);
           

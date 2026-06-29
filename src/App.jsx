@@ -525,15 +525,37 @@ export default function App() {
     }
   };
 
-  // Admin operations: Add Product image loader
+  // Admin operations: Add Product image loader (with client-side canvas compression)
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
     const reader = new FileReader();
     reader.onloadend = () => {
-      setNewProductImageBase64(reader.result);
-      setImagePreview(reader.result);
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 400; // Optimal size for display thumbnails
+        let width = img.width;
+        let height = img.height;
+
+        if (width > MAX_WIDTH) {
+          height = Math.round((height * MAX_WIDTH) / width);
+          width = MAX_WIDTH;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Compress as JPEG with 0.75 quality (highly optimized file size < 30KB)
+        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.75);
+        setNewProductImageBase64(compressedBase64);
+        setImagePreview(compressedBase64);
+      };
+      img.src = reader.result;
     };
     reader.readAsDataURL(file);
   };
