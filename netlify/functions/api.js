@@ -432,6 +432,77 @@ export const handler = async (event, context) => {
         headers,
         body: JSON.stringify({ success: true, message: "Producto guardado con éxito" })
       };
+    /* ==========================================
+       2b. ROUTE: GET /product (Get single product details, including full-size image)
+       ========================================== */
+    if (path === "/product" && method === "GET") {
+      const id = event.queryStringParameters.id;
+      if (!id) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: "Falta ID de producto" }) };
+      }
+
+      if (dbClient) {
+        const result = await dbClient.execute({
+          sql: "SELECT * FROM products WHERE id = ?",
+          args: [id]
+        });
+
+        if (result.rows.length === 0) {
+          return { statusCode: 404, headers, body: JSON.stringify({ error: "Producto no encontrado" }) };
+        }
+
+        const row = result.rows[0];
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({
+            id: row.id,
+            name: row.name,
+            price: row.price,
+            category: row.category,
+            image: row.image,
+            shop_id: row.shop_id || 'main'
+          })
+        };
+      } else {
+        const prod = memoryProducts.find(p => p.id === id);
+        if (!prod) {
+          return { statusCode: 404, headers, body: JSON.stringify({ error: "Producto no encontrado" }) };
+        }
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify(prod)
+        };
+      }
+    }
+
+    /* ==========================================
+       2c. ROUTE: POST /products/update-image (Optimize image directly in DB)
+       ========================================== */
+    if (path === "/products/update-image" && method === "POST") {
+      const { id, image } = JSON.parse(event.body);
+      if (!id || !image) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: "Datos de optimización inválidos" }) };
+      }
+
+      if (dbClient) {
+        await dbClient.execute({
+          sql: "UPDATE products SET image = ? WHERE id = ?",
+          args: [image, id]
+        });
+      } else {
+        const prodIdx = memoryProducts.findIndex(p => p.id === id);
+        if (prodIdx !== -1) {
+          memoryProducts[prodIdx].image = image;
+        }
+      }
+
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({ success: true, message: "Imagen de producto optimizada con éxito" })
+      };
     }
 
     /* ==========================================

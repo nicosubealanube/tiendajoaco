@@ -300,7 +300,19 @@ export default function App() {
   const [isCartOpen, setIsCartOpen] = useState(false);
 
   // Admin Panels state
-  const [activeAdminTab, setActiveAdminTab] = useState('products'); // 'products' or 'categories'
+  const [activeAdminTab, setActiveAdminTab] = useState('products'); // 'products', 'categories', 'optimize'
+  
+  // Image Optimization States
+  const [isOptimizing, setIsOptimizing] = useState(false);
+  const [optimizeProgress, setOptimizeProgress] = useState('');
+  const [oversizedProductsList, setOversizedProductsList] = useState([]);
+
+  // Automatically search for oversized images when admin mode is activated
+  useEffect(() => {
+    if (isAdminMode) {
+      checkOversizedProducts();
+    }
+  }, [isAdminMode]);
   
   // Product Edit state
   const [editingProduct, setEditingProduct] = useState(null);
@@ -523,6 +535,110 @@ export default function App() {
         alert('Error de red. No se pudo eliminar la categoría.');
       }
     }
+  };
+
+  // Fetch list of products that need optimization
+  const checkOversizedProducts = async () => {
+    try {
+      setOptimizeProgress('Buscando imágenes pesadas en la base de datos...');
+      const res = await fetch('/api/debug');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.productsList) {
+          const oversized = data.productsList.filter(p => p.img_len > 120000);
+          setOversizedProductsList(oversized);
+          if (oversized.length > 0) {
+            setOptimizeProgress(`Se encontraron ${oversized.length} imágenes pesadas que necesitan optimización para restaurar sus fotos reales.`);
+          } else {
+            setOptimizeProgress('¡Excelente! Todas las imágenes de la base de datos están optimizadas. No hay fotos pesadas.');
+          }
+        }
+      } else {
+        setOptimizeProgress('No se pudo conectar con el servidor de diagnóstico.');
+      }
+    } catch (err) {
+      console.error(err);
+      setOptimizeProgress('Error de red al buscar imágenes.');
+    }
+  };
+
+  // Run the batch optimization
+  const runImageOptimization = async () => {
+    if (oversizedProductsList.length === 0) return;
+    setIsOptimizing(true);
+    
+    let count = 0;
+    for (const p of oversizedProductsList) {
+      setOptimizeProgress(`[${count + 1}/${oversizedProductsList.length}] Descargando foto original de "${p.name}"...`);
+      
+      try {
+        const getRes = await fetch(`/api/product?id=${p.id}`);
+        if (!getRes.ok) throw new Error('No se pudo descargar el producto');
+        const product = await getRes.json();
+        
+        if (product.image && product.image.startsWith('data:image/')) {
+          setOptimizeProgress(`[${count + 1}/${oversizedProductsList.length}] Comprimiendo "${p.name}"...`);
+          
+          const compressed = await new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => {
+              const canvas = document.createElement('canvas');
+              const MAX_WIDTH = 400;
+              let width = img.width;
+              let height = img.height;
+
+              if (width > MAX_WIDTH) {
+                height = Math.round((height * MAX_WIDTH) / width);
+                width = MAX_WIDTH;
+              }
+
+              canvas.width = width;
+              canvas.height = height;
+
+              const ctx = canvas.getContext('2d');
+              ctx.drawImage(img, 0, 0, width, height);
+
+              resolve(canvas.toDataURL('image/jpeg', 0.75));
+            };
+            img.src = product.image;
+          });
+
+          setOptimizeProgress(`[${count + 1}/${oversizedProductsList.length}] Guardando optimización de "${p.name}"...`);
+
+          const postRes = await fetch('/api/products/update-image', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'joaco2026'
+            },
+            body: JSON.stringify({
+              id: p.id,
+              image: compressed
+            })
+          });
+
+          if (!postRes.ok) throw new Error('No se pudo guardar la imagen optimizada');
+          
+          // Update local state products list so it displays the new compressed image immediately
+          setProducts(prevProducts => prevProducts.map(item => 
+            item.id === p.id ? { ...item, image: compressed } : item
+          ));
+          
+          count++;
+        } else {
+          count++;
+        }
+      } catch (err) {
+        console.error(`Error optimizing ${p.name}:`, err);
+        setOptimizeProgress(`Error en "${p.name}". Continuando con el siguiente...`);
+        await new Promise(r => setTimeout(r, 1500));
+      }
+    }
+
+    setIsOptimizing(false);
+    setOversizedProductsList([]);
+    setOptimizeProgress(`¡Optimización finalizada! Se procesaron ${count} imágenes con éxito. Tu web cargará al instante y todas las fotos reales han sido restablecidas.`);
+    fetchData();
   };
 
   // Admin operations: Add Product image loader (with client-side canvas compression)
@@ -1170,6 +1286,12 @@ export default function App() {
               >
                 Categorías
               </button>
+              <button 
+                onClick={() => { setActiveAdminTab('optimize'); checkOversizedProducts(); }} 
+                className={`admin-tab-btn ${activeAdminTab === 'optimize' ? 'active' : ''}`}
+              >
+                Optimizar Fotos
+              </button>
             </div>
 
             <div className="admin-panel-content">
@@ -1338,7 +1460,7 @@ export default function App() {
                     )}
                   </div>
                 </div>
-              ) : (
+              ) : activeAdminTab === 'categories' ? (
                 /* MANAGE CATEGORIES WORKSPACE */
                 <div className="categories-dashboard">
                   {/* Left Form: Add Category */}
@@ -1379,6 +1501,85 @@ export default function App() {
                           </button>
                         </div>
                       ))}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* OPTIMIZE IMAGES WORKSPACE */
+                <div className="admin-grid-layout" style={{ gridTemplateColumns: '1fr' }}>
+                  <div className="admin-form-card" style={{ maxWidth: '800px', margin: '0 auto', width: '100%' }}>
+                    <h3 className="admin-form-title">⚡ Optimización de Fotos de Productos</h3>
+                    <p style={{ color: 'var(--text-light)', marginBottom: '1.5rem', lineHeight: '1.5', fontSize: '0.95rem' }}>
+                      Esta herramienta analiza todas las fotos del catálogo guardadas en la base de datos de Turso. Si encuentra imágenes que se subieron con un peso excesivo (fotos originales grandes desde el celular que ralentizan la página), las descargará una a una, las comprimirá en tu navegador a un tamaño óptimo (&lt;25KB) y las volverá a guardar de manera permanente. Esto restaurará las fotos originales que actualmente muestran el logotipo de Tienda Joaco debido a los límites de tamaño en la nube.
+                    </p>
+
+                    <div className="optimize-status-box" style={{ 
+                      background: 'var(--bg-light)', 
+                      padding: '1.5rem', 
+                      borderRadius: '12px', 
+                      border: '1px solid var(--dark-border)',
+                      marginBottom: '1.5rem',
+                      fontFamily: 'monospace',
+                      fontSize: '0.9rem',
+                      lineHeight: '1.6',
+                      color: 'var(--text-dark)'
+                    }}>
+                      <strong>Estado del Sistema:</strong><br />
+                      {optimizeProgress || 'Listo para escanear.'}
+                    </div>
+
+                    {oversizedProductsList.length > 0 && (
+                      <div className="oversized-list-preview" style={{ marginBottom: '1.5rem' }}>
+                        <h4 style={{ marginBottom: '0.5rem', fontSize: '0.95rem', color: 'var(--text-dark)' }}>
+                          Productos pendientes de optimización ({oversizedProductsList.length}):
+                        </h4>
+                        <div style={{ 
+                          maxHeight: '150px', 
+                          overflowY: 'auto', 
+                          border: '1px solid var(--dark-border)', 
+                          borderRadius: '8px', 
+                          padding: '0.5rem',
+                          background: 'white'
+                        }}>
+                          {oversizedProductsList.map((p, idx) => (
+                            <div key={idx} style={{ 
+                              padding: '0.25rem 0.5rem', 
+                              borderBottom: idx < oversizedProductsList.length - 1 ? '1px solid #f0f0f0' : 'none',
+                              fontSize: '0.85rem',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              color: 'var(--text-dark)'
+                            }}>
+                              <span>{p.name} ({p.category})</span>
+                              <span style={{ color: '#d32f2f', fontWeight: 600 }}>{(p.img_len / 1024).toFixed(0)} KB</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', gap: '1rem' }}>
+                      <button 
+                        type="button" 
+                        onClick={checkOversizedProducts} 
+                        disabled={isOptimizing}
+                        className="submit-form-btn"
+                        style={{ background: '#f5f5f5', color: '#333', border: '1px solid #ccc' }}
+                      >
+                        🔄 Buscar Imágenes Pesadas
+                      </button>
+
+                      {oversizedProductsList.length > 0 && (
+                        <button 
+                          type="button" 
+                          onClick={runImageOptimization} 
+                          disabled={isOptimizing}
+                          className="submit-form-btn"
+                          style={{ background: 'var(--primary)', color: 'white' }}
+                        >
+                          {isOptimizing ? '⚡ Optimizando...' : '🚀 Comenzar Optimización'}
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
