@@ -261,12 +261,12 @@ export const handler = async (event, context) => {
     };
   }
 
-  // If Turso is configured, make sure tables are initialized (only once per container, with 3s timeout)
+  // If Turso is configured, make sure tables are initialized (only once per container, with 8s timeout)
   let isDbAvailable = false;
   if (globalDbClient) {
     if (!isInitialized) {
       try {
-        await withTimeout(initializeDatabase(globalDbClient), 3000);
+        await withTimeout(initializeDatabase(globalDbClient), 8000);
         isInitialized = true;
         isDbAvailable = true;
       } catch (dbInitErr) {
