@@ -432,6 +432,7 @@ export const handler = async (event, context) => {
         headers,
         body: JSON.stringify({ success: true, message: "Producto guardado con éxito" })
       };
+    }
     /* ==========================================
        2b. ROUTE: GET /product (Get single product details, including full-size image)
        ========================================== */
