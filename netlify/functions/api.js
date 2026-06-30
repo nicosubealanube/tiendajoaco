@@ -140,14 +140,14 @@ const isTursoConfigured = () => {
 };
 
 // Initialize connection
-let dbClient = null;
+let globalDbClient = null;
 if (isTursoConfigured()) {
   try {
     let databaseUrl = process.env.TURSO_DATABASE_URL || "";
     if (databaseUrl.startsWith("libsql://")) {
       databaseUrl = databaseUrl.replace("libsql://", "https://");
     }
-    dbClient = createClient({
+    globalDbClient = createClient({
       url: databaseUrl,
       authToken: process.env.TURSO_AUTH_TOKEN,
     });
@@ -262,15 +262,24 @@ export const handler = async (event, context) => {
   }
 
   // If Turso is configured, make sure tables are initialized (only once per container, with 3s timeout)
-  if (dbClient && !isInitialized) {
-    try {
-      await withTimeout(initializeDatabase(dbClient), 3000);
-      isInitialized = true;
-    } catch (dbInitErr) {
-      console.error("Database initialization failed, switching to memory mode:", dbInitErr);
-      dbClient = null; // Fallback to memory cache
+  let isDbAvailable = false;
+  if (globalDbClient) {
+    if (!isInitialized) {
+      try {
+        await withTimeout(initializeDatabase(globalDbClient), 3000);
+        isInitialized = true;
+        isDbAvailable = true;
+      } catch (dbInitErr) {
+        console.error("Database initialization failed, using memory mode fallback for this request:", dbInitErr);
+        // Do NOT nullify globalDbClient permanently so we can retry on next requests!
+      }
+    } else {
+      isDbAvailable = true;
     }
   }
+
+  // Shadow globalDbClient locally as dbClient for all route endpoints
+  const dbClient = isDbAvailable ? globalDbClient : null;
 
   try {
     /* ==========================================
@@ -289,6 +298,7 @@ export const handler = async (event, context) => {
        ========================================== */
     if (path === "/debug" && method === "GET") {
       const debugInfo = {
+        hasGlobalDbClient: !!globalDbClient,
         hasDbClient: !!dbClient,
         isInitialized,
         tursoUrl: process.env.TURSO_DATABASE_URL ? (process.env.TURSO_DATABASE_URL.length > 20 ? process.env.TURSO_DATABASE_URL.substring(0, 20) + "..." : process.env.TURSO_DATABASE_URL) : "undefined",
