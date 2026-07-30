@@ -306,15 +306,15 @@ export const handler = async (event, context) => {
         nodeVersion: process.version,
       };
 
-      if (dbClient) {
+      if (globalDbClient) {
         try {
           const start = Date.now();
           // Test select 1
-          const testRes = await dbClient.execute("SELECT 1");
+          const testRes = await globalDbClient.execute("SELECT 1");
           debugInfo.queryResult = testRes.rows;
           
           // Test products size
-          const prodSizeRes = await dbClient.execute("SELECT id, name, category, length(image) as img_len, shop_id FROM products");
+          const prodSizeRes = await globalDbClient.execute("SELECT id, name, category, length(image) as img_len, shop_id FROM products");
           debugInfo.productsList = prodSizeRes.rows;
           
           // Test total database size estimation
@@ -330,7 +330,7 @@ export const handler = async (event, context) => {
           debugInfo.errorStack = err.stack;
         }
       } else {
-        debugInfo.error = "dbClient is null";
+        debugInfo.error = "globalDbClient is null";
       }
 
       return {
