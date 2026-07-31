@@ -77,7 +77,7 @@ let memoryProducts = [
     name: 'Empanadas de Carne (3u)',
     price: 2400,
     category: 'Entradas',
-    image: 'https://images.unsplash.com/photo-1541532713592-79a0317b6b77?auto=format&fit=crop&w=400&q=80',
+    image: '/empanadas.jpg',
     shop_id: 'lostan'
   },
   {
@@ -129,6 +129,63 @@ let memoryProducts = [
     category: 'Paletas',
     image: 'https://images.unsplash.com/photo-1488477181946-6428a0291777?auto=format&fit=crop&w=400&q=80',
     shop_id: 'rompesol'
+  },
+  // Empanadas Lo de Mar
+  {
+    id: 'empa-1',
+    name: 'Empanada de Carne Cortada a Cuchillo',
+    price: 900,
+    category: 'Empanadas Saladas',
+    image: '/empanadas.jpg',
+    shop_id: 'lodemar'
+  },
+  {
+    id: 'empa-2',
+    name: 'Empanada de Jamón y Queso',
+    price: 850,
+    category: 'Empanadas Saladas',
+    image: '/empanadas.jpg',
+    shop_id: 'lodemar'
+  },
+  {
+    id: 'empa-3',
+    name: 'Empanada de Pollo al Verdeo',
+    price: 900,
+    category: 'Empanadas Saladas',
+    image: '/empanadas.jpg',
+    shop_id: 'lodemar'
+  },
+  {
+    id: 'empa-4',
+    name: 'Empanada Caprese',
+    price: 850,
+    category: 'Empanadas Saladas',
+    image: '/empanadas.jpg',
+    shop_id: 'lodemar'
+  },
+  {
+    id: 'empa-5',
+    name: 'Empanada de Humita',
+    price: 850,
+    category: 'Empanadas Saladas',
+    image: '/empanadas.jpg',
+    shop_id: 'lodemar'
+  },
+  {
+    id: 'empa-6',
+    name: 'Empanada Dulce de Membrillo',
+    price: 800,
+    category: 'Empanadas Dulces',
+    image: '/empanadas.jpg',
+    shop_id: 'lodemar'
+  },
+  {
+    id: 'empa-7',
+    name: 'Gaseosa Coca-Cola 1.5L',
+    price: 1800,
+    category: 'Bebidas',
+    image: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?auto=format&fit=crop&w=400&q=80',
+    shop_id: 'lodemar'
   }
 ];
 
@@ -205,7 +262,7 @@ const initializeDatabase = async (client) => {
   }
 
   // Seed default restaurant & ice cream shop products
-  for (const shop of ['tinicome', 'lostan', 'rompesol']) {
+  for (const shop of ['tinicome', 'lostan', 'rompesol', 'lodemar']) {
     const shopProdCount = await client.execute({
       sql: "SELECT COUNT(*) as count FROM products WHERE shop_id = ?",
       args: [shop]
@@ -361,6 +418,8 @@ export const handler = async (event, context) => {
                 img = 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=400&q=80';
               } else if (row.shop_id === 'rompesol') {
                 img = 'https://images.unsplash.com/photo-1501443762994-82bd5dace89a?auto=format&fit=crop&w=400&q=80';
+              } else if (row.shop_id === 'lodemar') {
+                img = '/empanadas.jpg';
               } else {
                 img = '/logo.jpg';
               }

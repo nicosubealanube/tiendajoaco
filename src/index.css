@@ -1645,6 +1645,13 @@ button {
   --shadow-green: 0 4px 14px rgba(255, 214, 0, 0.25);
 }
 
+.theme-lodemar {
+  --supermarket-green: #e5681c;       /* Lo de Mar warm orange */
+  --supermarket-green-dark: #b3470c;  /* Lo de Mar dark brown-orange */
+  --supermarket-green-light: #fdf4ed; /* Lo de Mar light orange backdrop */
+  --shadow-green: 0 4px 14px rgba(229, 104, 28, 0.3);
+}
+
 /* Local Shop Views elements styling */
 .shop-back-btn {
   background-color: var(--light-surface);

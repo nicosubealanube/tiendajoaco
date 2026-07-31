@@ -5,6 +5,7 @@ const SHOPS = {
   restaurantes: [
     { name: "Tinicome", url: "/tinicome", type: "tinicome", isMenuShop: true },
     { name: "Restaurante El Lostan", url: "/lostan", type: "lostan", isMenuShop: true },
+    { name: "Empanadas Lo de Mar", url: "/lodemar", type: "lodemar", isMenuShop: true },
     { name: "La Perla", url: "https://www.laperlaballester.com.ar", type: "la_perla" },
     { name: "La Carerita", url: "https://lacarerita.com.ar", type: "la_carerita" },
     { name: "Fiko", isCustom: true, type: "fiko" },
@@ -79,6 +80,18 @@ const SHOP_THEMES = {
     logo: '/rompesol.jpg',
     categories: ['Vasos', 'Conos', 'Paletas', 'Sabores'],
     icon: '🍦'
+  },
+  lodemar: {
+    themeClass: 'theme-lodemar',
+    color: '#e5681c', // Lo de Mar warm orange
+    colorDark: '#b3470c',
+    colorLight: '#fdf4ed',
+    title: 'Empanadas Lo de Mar',
+    subtitle: 'SABOR CASERO & TRADICIÓN',
+    bannerText: 'Las empanadas más ricas hechas con amor y sabor tradicional.',
+    logo: '/lodemar.jpg',
+    categories: ['Empanadas Saladas', 'Empanadas Dulces', 'Bebidas'],
+    icon: '🥟'
   }
 };
 
@@ -93,6 +106,10 @@ function ShopLogo({ type }) {
     case "lostan":
       return (
         <img src="/lostan.png" alt="Restaurante El Lostan" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      );
+    case "lodemar":
+      return (
+        <img src="/lodemar.jpg" alt="Empanadas Lo de Mar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
       );
     case "rompesol":
       return (
@@ -292,9 +309,9 @@ export default function App() {
   const [activeHubCategory, setActiveHubCategory] = useState(null); // 'restaurantes', 'supermercados', etc.
   
   // Custom interactive shop view state
-  const [activeShopDetail, setActiveShopDetail] = useState(null); // null, 'tinicome', 'lostan', 'rompesol'
-  const [localAdminShops, setLocalAdminShops] = useState({ tinicome: false, lostan: false, rompesol: false });
-  const [passwordTarget, setPasswordTarget] = useState('global'); // 'global', 'tinicome', 'lostan', 'rompesol'
+  const [activeShopDetail, setActiveShopDetail] = useState(null); // null, 'tinicome', 'lostan', 'rompesol', 'lodemar'
+  const [localAdminShops, setLocalAdminShops] = useState({ tinicome: false, lostan: false, rompesol: false, lodemar: false });
+  const [passwordTarget, setPasswordTarget] = useState('global'); // 'global', 'tinicome', 'lostan', 'rompesol', 'lodemar'
 
   const [isAdminMode, setIsAdminMode] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -396,6 +413,7 @@ export default function App() {
     if (prod.shop_id === 'tinicome') return `[Tinicome] ${prod.name}`;
     if (prod.shop_id === 'lostan') return `[El Lostan] ${prod.name}`;
     if (prod.shop_id === 'rompesol') return `[Rompesol] ${prod.name}`;
+    if (prod.shop_id === 'lodemar') return `[Lo de Mar] ${prod.name}`;
     return prod.name;
   };
 
@@ -1079,7 +1097,7 @@ export default function App() {
                     <input 
                       type="text" 
                       required
-                      placeholder={activeShopDetail === 'rompesol' ? "Ej. Dulce de Leche Tentación" : "Ej. Milanesa Completa"}
+                      placeholder={activeShopDetail === 'rompesol' ? "Ej. Dulce de Leche Tentación" : activeShopDetail === 'lodemar' ? "Ej. Empanada de Carne" : "Ej. Milanesa Completa"}
                       value={newProductName}
                       onChange={(e) => setNewProductName(e.target.value)}
                       className="form-input"
